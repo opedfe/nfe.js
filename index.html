@@ -6,9 +6,18 @@
 	<script src="./nfe.js"></script>
 </head>
 <body>
+<div class='demo'>
+nfejs demo
+</div>
 <script>
-nfe.use("modules/module", function(m){
-	console.log(m)
+nfe.setConfig({
+    base:"./",
+    alias:{
+        module:'modules/module'
+    }
+});
+nfe.use("module", function(m){
+	m.init();
 });
 </script>
 </body>
