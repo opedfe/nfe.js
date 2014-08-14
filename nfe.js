@@ -22,6 +22,12 @@
         version:"1.0.0"
     };
 
+    var State = {
+        READY:0,
+        LOADING:1,
+        COMPLETED:2
+    };
+
     var anonymousMeta = null;
     /**
      * URI拼接
@@ -197,8 +203,16 @@
         return id;
     }
 
-	function load(resId, url, callback){
-        nfe.cache[url] = 1;
+	function load(meta, callback){
+        
+        var resId = getId(meta.id);
+        var url = getURI(resId);
+
+        if(typeof nfe.cache[meta.id] !== 'undefined'){
+            callback.call(this, url);
+            return;
+        } 
+        nfe.cache[meta.id] = meta;
         debug(1, '[load] url:' + url);
 		var type = util.fileType(url),
 			isJs = type === 'js',
@@ -225,16 +239,17 @@
 				if(isJs && head && node.parentNode){
 					head.removeChild(node);
                     if(anonymousMeta){
-                        save(resId, anonymousMeta);
+                        anonymousMeta.id = meta.id;
+                        save(meta.id, anonymousMeta);
                         anonymousMeta = null;
                     }
 					if(callback){
-						callback.call();
+						callback.call(this, url);
 					}
 					node = null;
 				}else if(isCss){
                     if(callback){
-						callback.call();
+						callback.call(this, url);
 					}
                 }
 			}
@@ -257,7 +272,7 @@
                     if (node.sheet) {
                         clearTimeout(tid);
                         clearInterval(intId);
-                        if (callback) callback.call();
+                        if (callback) callback.call(this, url);
                         node = null;
                     }
                 }, 20);
@@ -265,7 +280,7 @@
                 //if (callback) callback.call();
             }
         } else if (!isJs) {
-            if (callback) callback.call();
+            if (callback) callback.call(this, url);
         }
 	}
 
@@ -274,27 +289,39 @@
 			ids = [ids];
 		}
         ids = ids.concat(nfe.config.preload);
+        var metas = [];
         for(var i=0; i<ids.length; i++){
-            ids[i] = getId(ids[i]);
+            //ids[i] = getId(ids[i]);
+            metas[i] = {
+                id:ids[i],
+                status:State.READY
+            };
         }
-        ids = transferIds(nfe.config.base, ids);
-		Loader.run(ids, callback);
+        //ids = transferIds(nfe.config.base, ids);
+		//Loader.run(ids, callback);
+        Loader.run(metas, callback);
 	};
 
 	function require(id, base){
-        
-        id = getId(id);
+        var nid = id;
         if(typeof base !== 'undefined'){
-            id = uri.join(uri.dirname(base), id);
+            nid = uri.join(uri.dirname(base), nid);
         }
-		var url = getURI(id);
+        
+        var meta = nfe.cache[nid];
+        if(typeof meta === 'undefined'){
+            throw new Error('Not find Module: ' + nid);
+        }
+        var factory = meta.factory;
+
+        nid = getId(nid);
+		var url = getURI(nid);
 		var module = {
-            id:id,
+            id:nid,
             uri:url
         };
         debug(3, '[require] url: ' + url);
 		module.exports = {};
-        var factory = nfe.cache[url];
         
         if(typeof factory === 'function'){
             var r = function(iid){
@@ -303,7 +330,7 @@
             r.async = function(ids, callback){
                 nfe.use(ids, callback);
             };
-            var result = nfe.cache[url].call(this, r, module.exports, module);
+            var result = factory.call(this, r, module.exports, module);
             debug(4, module);
             if(typeof result === 'undefined'){
                 return module.exports;
@@ -321,19 +348,21 @@
         }
 		//var module = {};
 		//factory.apply(this, require, module.exports, module);
-        id = getId(id);
+        //id = getId(id);
 
         if(deps.length > 0){
-            
+            var metas = [];
             for(var i=0; i<deps.length; i++){
-                deps[i] = getId(deps[i]);
+                metas[i] = {
+                    id:uri.join(uri.dirname(id), deps[i]),
+                    status:State.READY
+                };
             }
-		    Loader.push(transferIds(uri.dirname(id), deps));
+		    Loader.push(metas);
         }
         var meta = {
             id:id,
-            factory:factory,
-            deps:deps
+            factory:factory
         };
         if(id !== undefined){   
             save(id, meta);
@@ -346,53 +375,39 @@
         
         debug(1, '[define] ' + id);
         var nid = id || meta.id;
-		var url = getURI(nid);
-        debug(1, '[cache] ' + url);
-		nfe.cache[url] = meta.factory;
-    }
-
-    function transferIds(base, ids){
-        var s = [];
-        util.each(ids, function(id, i){
-            s[i] = uri.join(base, id);
-        });
-        return s;
+		//var url = getURI(nid);
+        debug(1, '[cache] ' + nid);
+		nfe.cache[nid] = meta;
     }
 
 	var Loader = {
 		size:0,
 		callback:function(){},
-		push:function(ids, callback){
+		push:function(metas, callback){
 			var me = this;
 			if(typeof callback != 'undefined'){
 				me.callback = callback;
 			}
-			me.size += ids.length;
-			util.each(ids, function(id, index){
-				var url = getURI(id);
-                if(typeof nfe.cache[url] === 'undefined'){
-                    load(id, url, function(){
-                        debug(1, '[loaded] url:' + url);
-                        me.size--;		
-                        if(me.size === 0){
-                            me.callback.call();
-                        }
-                    });
-                }else{
-                    me.size--;
+			me.size += metas.length;
+			util.each(metas, function(meta, index){
+                //var id = getId(meta.id);
+				//var url = getURI(id);
+                load(meta, function(url){
+                    debug(1, '[loaded] url:' + url);
+                    me.size--;		
                     if(me.size === 0){
                         me.callback.call();
                     }
-                }
+                });
 			});
 		},
-		run:function(ids, callback){
+		run:function(metas, callback){
 			var me = this;
-			me.push(ids, function(){
+			me.push(metas, function(){
                 debug(3, 'load resources finished!');
 				var args = [];
-				util.each(ids, function(id, j){
-					args.push(require(id));
+				util.each(metas, function(meta, j){
+					args.push(require(meta.id));
 				});
 				callback.apply(global, args);
 			});
@@ -403,7 +418,7 @@
 	global.define = define;
 
 
-    var level = 0;
+    var level = 5;
     function debug(lv, msg){
         if(lv < level){
             var d = new Date();
