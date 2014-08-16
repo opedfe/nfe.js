@@ -310,11 +310,18 @@
         
         var meta = nfe.cache[nid];
         if(typeof meta === 'undefined'){
-            throw new Error('Not find Module: ' + nid);
+            throw new Error('Not find Module: ' + id);
         }
         var factory = meta.factory;
 
         nid = getId(nid);
+
+		//如果不存在factory，则通过别名再查询一下
+		if(typeof factory === 'undefined'){
+			meta = nfe.cache[nid];
+			factory = meta.factory;
+		}
+
 		var url = getURI(nid);
 		var module = {
             id:nid,
@@ -354,7 +361,7 @@
             var metas = [];
             for(var i=0; i<deps.length; i++){
                 metas[i] = {
-                    id:uri.join(uri.dirname(id), deps[i]),
+                    id:uri.join(uri.dirname(getId(id)), deps[i]),
                     status:State.READY
                 };
             }
@@ -418,11 +425,12 @@
 	global.define = define;
 
 
-    var level = 5;
+    var level = 0;
     function debug(lv, msg){
         if(lv < level){
             var d = new Date();
-            console.log(d.getTime() + ' - ' + msg);
+            console.log(d.getTime() + ' - ');
+            console.log(msg);
         }
     }
 })(this, undefined);
