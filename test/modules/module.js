@@ -1,4 +1,4 @@
-define("modules/module", ["jquery", "./dep", "./module.css"], function(require, exports, module){
+define("test/modules/module", ["jquery", "./dep", "./module.css"], function(require, exports, module){
 	var dep = require('./dep');
 	
 	var $ = require('jquery');
