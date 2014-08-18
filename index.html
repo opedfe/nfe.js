@@ -13,8 +13,11 @@ nfejs demo
 nfe.setConfig({
     base:"./",
     alias:{
-        module:'modules/module'
-    }
+		jquery:'libs/jquery-1.11.1',
+		jqueryui:'libs/jquery-ui',
+        module:'test/modules/module'
+    },
+	preload:['jquery']
 });
 nfe.use("module", function(m){
 	m.init();

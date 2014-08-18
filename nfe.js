@@ -305,7 +305,8 @@
 	function require(id, base){
         var nid = id;
         if(typeof base !== 'undefined'){
-            nid = uri.join(uri.dirname(base), nid);
+			var root = getId(base);
+            nid = uri.join(uri.dirname(root), nid);
         }
         
         var meta = nfe.cache[nid];
@@ -332,7 +333,7 @@
         
         if(typeof factory === 'function'){
             var r = function(iid){
-                return require(iid, id);
+                return require(iid, nid);
             };
             r.async = function(ids, callback){
                 nfe.use(ids, callback);
@@ -354,7 +355,7 @@
             id = undefined;
         }else if(arguments.length == 2){
 			factory = deps;
-			if(nfe.isArray(id)){
+			if(util.isArray(id)){
 				deps = id;
 				id = undefined;
 			}else{
@@ -370,7 +371,7 @@
             var metas = [];
             for(var i=0; i<deps.length; i++){
                 metas[i] = {
-                    id:uri.join(uri.dirname(getId(id)), deps[i]),
+                    id:id === undefined ? deps[i] : uri.join(uri.dirname(getId(id)), deps[i]),
                     status:State.READY
                 };
             }
@@ -430,6 +431,7 @@
 		}
 	};
 
+	define.amd = true;
 	global.nfe = nfe;
 	global.define = define;
 
