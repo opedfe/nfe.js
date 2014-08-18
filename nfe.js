@@ -352,7 +352,16 @@
             factory = id;
             deps = [];
             id = undefined;
-        }
+        }else if(arguments.length == 2){
+			factory = deps;
+			if(nfe.isArray(id)){
+				deps = id;
+				id = undefined;
+			}else{
+				id = id;
+				deps = [];
+			}
+		}
 		//var module = {};
 		//factory.apply(this, require, module.exports, module);
         //id = getId(id);
