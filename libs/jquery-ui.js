@@ -8,12 +8,21 @@
 
 		// AMD. Register as an anonymous module.
 		define([ "jquery" ], factory );
+	} else if ( typeof define === "function" && define.cmd ) {
+		define([ "jquery" ], (function(){
+			return function(require, exports, module){
+				var $ = require('jquery');
+				factory($);
+				return $;
+			};
+		})() );
 	} else {
 
 		// Browser globals
 		factory( jQuery );
 	}
-}(function( $ ) {
+}(function($) {
+
 /*!
  * jQuery UI Core 1.11.0
  * http://jqueryui.com
@@ -16144,7 +16153,5 @@ var tooltip = $.widget( "ui.tooltip", {
 		this.liveRegion.remove();
 	}
 });
-
-
 
 }));

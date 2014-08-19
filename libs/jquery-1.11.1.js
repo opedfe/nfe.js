@@ -10269,6 +10269,10 @@ if ( typeof define === "function" && define.amd ) {
 	define( "jquery", [], function() {
 		return jQuery;
 	});
+}else if ( typeof define === "function" && define.cmd ) {
+	define( "jquery", [], function() {
+		return jQuery;
+	});
 }
 
 

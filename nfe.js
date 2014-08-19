@@ -432,9 +432,11 @@
 		}
 	};
 
-	define.amd = true;
+	define.cmd = {};
 	global.nfe = nfe;
 	global.define = define;
+
+	global._require = require;
 
 
     var level = 0;
