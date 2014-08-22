@@ -375,7 +375,6 @@
                     status:State.READY
                 };
             }
-			console.log(metas);
 		    Loader.push(metas);
         }
         var meta = {
