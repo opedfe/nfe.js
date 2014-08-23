@@ -200,11 +200,15 @@
         if(nfe.config.alias[id]){
 			id = nfe.config.alias[id];
 		}
+		if(!TYPE_REG.test(id)){
+			id += '.js';
+		}
         return id;
     }
 
 	function load(meta, callback){
         
+		console.log(meta.id);
         var resId = getId(meta.id);
         var url = getURI(resId);
 
@@ -291,7 +295,7 @@
         ids = ids.concat(nfe.config.preload);
         var metas = [];
         for(var i=0; i<ids.length; i++){
-            //ids[i] = getId(ids[i]);
+            ids[i] = getId(ids[i]);
             metas[i] = {
                 id:ids[i],
                 status:State.READY
@@ -308,20 +312,13 @@
 			var root = getId(base);
             nid = uri.join(uri.dirname(root), nid);
         }
+		nid = getId(nid);
         
         var meta = nfe.cache[nid];
         if(typeof meta === 'undefined'){
             throw new Error('Not find Module: ' + id);
         }
         var factory = meta.factory;
-
-        nid = getId(nid);
-
-		//如果不存在factory，则通过别名再查询一下
-		if(typeof factory === 'undefined'){
-			meta = nfe.cache[nid];
-			factory = meta.factory;
-		}
 
 		var url = getURI(nid);
 		var module = {
@@ -370,8 +367,18 @@
         if(deps.length > 0){
             var metas = [];
             for(var i=0; i<deps.length; i++){
+				/*
+				if(id !== undefined){
+					var nid = getId(id);
+					var dir = uri.dirname(nid);
+					var dep = deps[i];
+					var url = uri.join(dir, dep);
+					console.log('id: ' + id + ',nid: ' + nid + ', dir: ' + dir + ', dep: ' + dep + ', url: ' + url);
+				}
+				*/
+				var nid = typeof id === undefined ? deps[i] : uri.join(uri.dirname(getId(id)), deps[i]);
                 metas[i] = {
-                    id:id === undefined ? deps[i] : uri.join(uri.dirname(getId(id)), deps[i]),
+                    id:getId(nid),
                     status:State.READY
                 };
             }
@@ -382,7 +389,7 @@
             factory:factory
         };
         if(id !== undefined){   
-            save(id, meta);
+            save(getId(id), meta);
         }else{
             anonymousMeta = meta;
         }
@@ -419,6 +426,7 @@
 			});
 		},
 		run:function(metas, callback){
+			console.log(metas);
 			var me = this;
 			me.push(metas, function(){
                 debug(3, 'load resources finished!');
