@@ -1,4 +1,4 @@
-define("test/modules/module", ["jqueryui", "./dep", "./module.css"], function(require, exports, module){
+define(function(require, exports, module){
 	var dep = require('./dep');
 	
 	var $ = require('jqueryui');

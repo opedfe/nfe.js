@@ -203,14 +203,15 @@
 
 	function load(meta, callback){
         
-        var resId = getId(meta.id);
-        var url = getURI(resId);
+        //var resId = getId(meta.id);
+        //var url = getURI(resId);
+        var url = getURI(meta.uri);
 
-        if(typeof nfe.cache[meta.id] !== 'undefined'){
+        if(typeof nfe.cache[meta.uri] !== 'undefined'){
             callback.call(this, url);
             return;
         } 
-        nfe.cache[meta.id] = meta;
+        nfe.cache[meta.uri] = meta;
         debug(1, '[load] url:' + url);
 		var type = util.fileType(url),
 			isJs = type === 'js',
@@ -238,16 +239,17 @@
 					head.removeChild(node);
                     if(anonymousMeta){
                         anonymousMeta.id = meta.id;
-                        save(meta.id, anonymousMeta);
+                        save(meta.uri, anonymousMeta);
                         anonymousMeta = null;
                     }
 					if(delayMetas.length > 0){
 						var metas = [];
 						util.each(delayMetas, function(dep, idx){
 							var nid = uri.join(uri.dirname(getId(meta.id)), dep.id);
-							nid = getId(nid);
+							var path = getId(nid);
 							metas[idx] = {
-								id:nid
+								id:nid,
+								uri:path
 							};
 						});
 						Loader.push(metas);
@@ -301,9 +303,10 @@
         ids = ids.concat(nfe.config.preload);
         var metas = [];
         for(var i=0; i<ids.length; i++){
-            ids[i] = getId(ids[i]);
+            var path = getId(ids[i]);
             metas[i] = {
-                id:ids[i]
+                id:ids[i],
+				uri:path
             };
         }
         //ids = transferIds(nfe.config.base, ids);
@@ -314,8 +317,8 @@
 	function require(id, base){
         var nid = id;
         if(typeof base !== 'undefined'){
-			var root = getId(base);
-            nid = uri.join(uri.dirname(root), nid);
+			//var root = getId(base);
+            nid = uri.join(uri.dirname(base), nid);
         }
 		nid = getId(nid);
         
@@ -335,12 +338,12 @@
         
         if(typeof factory === 'function'){
             var r = function(iid){
-                return require(iid, nid);
+                return require(iid, id);
             };
             r.async = function(ids, callback){
                 nfe.use(ids, callback);
             };
-            var result = factory.call(this, r, module.exports, module);
+            var result = factory.call(global, r, module.exports, module);
             debug(4, module);
             if(typeof result === 'undefined'){
                 return module.exports;
@@ -399,15 +402,16 @@
 					console.log('id: ' + id + ',nid: ' + nid + ', dir: ' + dir + ', dep: ' + dep + ', url: ' + url);
 				}
 				*/
-				var nid;
+				var nid, path;
 				if(id === undefined){
 					nid = deps[i];
 				}else{
-					nid = uri.join(uri.dirname(getId(id)), deps[i]);
-					nid = getId(nid);
+					nid = uri.join(uri.dirname(id), deps[i]);
+					path = getId(nid);
 				}
 				metas[i] = {
-					id:nid
+					id:nid,
+					uri:path
 				};
             }
 			// 如果id不存在，则延迟处理，到onload中
@@ -478,7 +482,7 @@
 	global._require = require;
 
 
-    var level = 0;
+    var level = 5;
     function debug(lv, msg){
         if(lv < level){
             var d = new Date();
