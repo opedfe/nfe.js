@@ -22,13 +22,8 @@
         version:"1.0.0"
     };
 
-    var State = {
-        READY:0,
-        LOADING:1,
-        COMPLETED:2
-    };
-
     var anonymousMeta = null;
+	var delayMetas = [];
     /**
      * URI拼接
      * uri.join("/path", "/to/", "home", "../school", "./index.html")
@@ -208,7 +203,6 @@
 
 	function load(meta, callback){
         
-		console.log(meta.id);
         var resId = getId(meta.id);
         var url = getURI(resId);
 
@@ -247,6 +241,18 @@
                         save(meta.id, anonymousMeta);
                         anonymousMeta = null;
                     }
+					if(delayMetas.length > 0){
+						var metas = [];
+						util.each(delayMetas, function(dep, idx){
+							var nid = uri.join(uri.dirname(getId(meta.id)), dep.id);
+							nid = getId(nid);
+							metas[idx] = {
+								id:nid
+							};
+						});
+						Loader.push(metas);
+						delayMetas = [];
+					}
 					if(callback){
 						callback.call(this, url);
 					}
@@ -297,8 +303,7 @@
         for(var i=0; i<ids.length; i++){
             ids[i] = getId(ids[i]);
             metas[i] = {
-                id:ids[i],
-                status:State.READY
+                id:ids[i]
             };
         }
         //ids = transferIds(nfe.config.base, ids);
@@ -345,10 +350,27 @@
         }
 	}
 
+	var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\/\r\n])+\/(?=[^\/])|\/\/.*|\.\s*require|(?:^|[^$])\brequire\s*\(\s*(["'])(.+?)\1\s*\)/g
+	var SLASH_RE = /\\\\/g
+
+	function parseDependencies(code) {
+	  var ret = []
+
+	  code.replace(SLASH_RE, "")
+		  .replace(REQUIRE_RE, function(m, m1, m2) {
+			if (m2) {
+			  ret.push(m2)
+			}
+		  })
+
+	  return ret
+	}
+
 	function define(id, deps, factory){
         if(arguments.length == 1){
             factory = id;
-            deps = [];
+			//分析依赖
+			deps = parseDependencies(factory.toString());
             id = undefined;
         }else if(arguments.length == 2){
 			factory = deps;
@@ -357,7 +379,8 @@
 				id = undefined;
 			}else{
 				id = id;
-				deps = [];
+				//分析依赖
+				deps = parseDependencies(factory.toString());
 			}
 		}
 		//var module = {};
@@ -376,13 +399,23 @@
 					console.log('id: ' + id + ',nid: ' + nid + ', dir: ' + dir + ', dep: ' + dep + ', url: ' + url);
 				}
 				*/
-				var nid = typeof id === undefined ? deps[i] : uri.join(uri.dirname(getId(id)), deps[i]);
-                metas[i] = {
-                    id:getId(nid),
-                    status:State.READY
-                };
+				var nid;
+				if(id === undefined){
+					nid = deps[i];
+				}else{
+					nid = uri.join(uri.dirname(getId(id)), deps[i]);
+					nid = getId(nid);
+				}
+				metas[i] = {
+					id:nid
+				};
             }
-		    Loader.push(metas);
+			// 如果id不存在，则延迟处理，到onload中
+			if(id !== undefined){
+		    	Loader.push(metas);
+			}else{
+				delayMetas = metas;
+			}
         }
         var meta = {
             id:id,
@@ -426,7 +459,6 @@
 			});
 		},
 		run:function(metas, callback){
-			console.log(metas);
 			var me = this;
 			me.push(metas, function(){
                 debug(3, 'load resources finished!');
