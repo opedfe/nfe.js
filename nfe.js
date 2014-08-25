@@ -16,7 +16,7 @@
  */
 (function(global, undefined){
 	var nfe = {};
-	nfe.version = '1.0.0';
+	nfe.version = '1.0.1';
 
     var uri = nfe.uri = {
         version:"1.0.0"
@@ -326,31 +326,43 @@
         if(typeof meta === 'undefined'){
             throw new Error('Not find Module: ' + id);
         }
-        var factory = meta.factory;
 
 		var url = getURI(nid);
-		var module = {
-            id:nid,
-            uri:url
-        };
-        debug(3, '[require] url: ' + url);
-		module.exports = {};
-        
-        if(typeof factory === 'function'){
-            var r = function(iid){
-                return require(iid, id);
-            };
-            r.async = function(ids, callback){
-                nfe.use(ids, callback);
-            };
-            var result = factory.call(global, r, module.exports, module);
-            debug(4, module);
-            if(typeof result === 'undefined'){
-                return module.exports;
-            }else{
-                return result;
-            }
-        }
+		debug(3, '[require] url: ' + url);
+		if(typeof meta.exports !== 'undefined'){
+			return meta.exports;
+		}else{
+			var factory = meta.factory;
+
+			var module = {
+				id:nid,
+				uri:url
+			};
+			module.exports = {};
+
+			var parentId = id;
+			if(meta.anonymous || id.indexOf('.') === 0){
+				parentId = nid;
+			}
+			
+			if(typeof factory === 'function'){
+				var r = function(iid){
+					return require(iid, parentId);
+				};
+				r.async = function(ids, callback){
+					nfe.use(ids, callback);
+				};
+				var result = factory.call(global, r, module.exports, module);
+				debug(4, module);
+				if(typeof result === 'undefined'){
+					meta.exports = module.exports;
+					return module.exports;
+				}else{
+					meta.exports = result;
+					return result;
+				}
+			}
+		}
 	}
 
 	var REQUIRE_RE = /"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\/\*[\S\s]*?\*\/|\/(?:\\\/|[^\/\r\n])+\/(?=[^\/])|\/\/.*|\.\s*require|(?:^|[^$])\brequire\s*\(\s*(["'])(.+?)\1\s*\)/g
@@ -423,7 +435,8 @@
         }
         var meta = {
             id:id,
-            factory:factory
+            factory:factory,
+			anonymous:id === undefined
         };
         if(id !== undefined){   
             save(getId(id), meta);
@@ -482,12 +495,16 @@
 	global._require = require;
 
 
-    var level = 5;
+    var level = 0;
     function debug(lv, msg){
         if(lv < level){
             var d = new Date();
-            console.log(d.getTime() + ' - ');
-            console.log(msg);
+            //console.log(d.getTime() + ' - ');
+			if(util.isString(msg)){
+            	console.log(msg + ' - ' + d.getTime());
+			}else{
+				console.log(msg);
+			}
         }
     }
 })(this, undefined);
