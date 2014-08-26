@@ -350,7 +350,18 @@
 					return require(iid, parentId);
 				};
 				r.async = function(ids, callback){
-					nfe.use(ids, callback);
+					if(util.isString(ids)){
+						ids = [ids];
+					}
+					var metas = [];
+					for(var i=0; i<ids.length; i++){
+						var path = getId(ids[i]);
+						metas[i] = {
+							id:ids[i],
+							uri:path
+						};
+					}
+					Loader.run(metas, callback || function(){});
 				};
 				var result = factory.call(global, r, module.exports, module);
 				debug(4, module);
@@ -386,12 +397,12 @@
             factory = id;
 			//分析依赖
 			deps = parseDependencies(factory.toString());
-            id = undefined;
+            id = null;
         }else if(arguments.length == 2){
 			factory = deps;
 			if(util.isArray(id)){
 				deps = id;
-				id = undefined;
+				id = null;
 			}else{
 				id = id;
 				//分析依赖
@@ -406,7 +417,7 @@
             var metas = [];
             for(var i=0; i<deps.length; i++){
 				/*
-				if(id !== undefined){
+				if(id !== null){
 					var nid = getId(id);
 					var dir = uri.dirname(nid);
 					var dep = deps[i];
@@ -415,7 +426,7 @@
 				}
 				*/
 				var nid, path;
-				if(id === undefined){
+				if(id === null){
 					nid = deps[i];
 				}else{
 					nid = uri.join(uri.dirname(id), deps[i]);
@@ -427,7 +438,7 @@
 				};
             }
 			// 如果id不存在，则延迟处理，到onload中
-			if(id !== undefined){
+			if(id !== null){
 		    	Loader.push(metas);
 			}else{
 				delayMetas = metas;
@@ -436,9 +447,9 @@
         var meta = {
             id:id,
             factory:factory,
-			anonymous:id === undefined
+			anonymous:id === null
         };
-        if(id !== undefined){   
+        if(id !== null){   
             save(getId(id), meta);
         }else{
             anonymousMeta = meta;
@@ -481,7 +492,9 @@
                 debug(3, 'load resources finished!');
 				var args = [];
 				util.each(metas, function(meta, j){
-					args.push(require(meta.id));
+					if(!/\.(css|less)(?=[?&,]|$)/.test(meta.id)){
+						args.push(require(meta.id));
+					}
 				});
 				callback.apply(global, args);
 			});
