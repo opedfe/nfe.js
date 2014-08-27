@@ -1,3 +1,4 @@
+
 /**
  * nfe 模块化加载器
  * @author lifayu@baidu.com
@@ -14,16 +15,30 @@
  *        /:/  /                     \:\__\    
  *        \/__/                       \/__/    
  */
-(function(global, undefined){
-	var nfe = {};
-	nfe.version = '1.0.1';
 
-    var uri = nfe.uri = {
-        version:"1.0.0"
-    };
 
-    var anonymousMeta = null;
-	var delayMetas = [];
+(function(global){
+	
+	var console = global.console || {
+		log:function(){},
+		info:function(){},
+		error:function(){},
+		debug:function(){}
+	};
+
+	var nfe = {
+		version:'1.1.0',
+		cache:{},
+		config:{
+			timeout:15,
+			base:'',
+			preload:[],
+			alias:{},
+			paths:{}
+		}
+	};
+	var uri = {};
+
     /**
      * URI拼接
      * uri.join("/path", "/to/", "home", "../school", "./index.html")
@@ -57,40 +72,6 @@
        return path.join("/");
     };
     /**
-     * 相对路径拼接，第一个参数为base uri
-     * @returns {*}
-     */
-    uri.resolve = function(/*urls...*/){
-        var numUrls = arguments.length;
-
-        if (numUrls === 0) {
-            throw new Error("resolveUrl requires at least one argument; got none.");
-        }
-
-        var base = document.createElement("base");
-        base.href = arguments[0];
-
-        if (numUrls === 1) {
-            return base.href;
-        }
-
-        var head = document.getElementsByTagName("head")[0];
-        head.insertBefore(base, head.firstChild);
-
-        var a = document.createElement("a");
-        var resolved;
-
-        for (var index = 1; index < numUrls; index++) {
-            a.href = arguments[index];
-            resolved = a.href;
-            base.href = resolved;
-        }
-
-        head.removeChild(base);
-
-        return resolved;
-    };
-    /**
      * 获取基准目录
      * @param path
      * @returns {string}
@@ -109,16 +90,10 @@
     uri.basename = function(path, ext){
         return path.split("/").pop().replace(new RegExp(ext + "$"), "");
     };
-	var base_guid = 10000;
-	nfe.config = {
-		timeout:15,
-		base:'',
-        preload:[],
-		alias:{}
-	};
 
-	nfe.config.base = window.location.origin + uri.dirname(window.location.pathname) + '/';
-	nfe.cache = {};
+	nfe.config.base = uri.dirname(window.location.pathname) + '/';
+
+	var base_guid = 1;
 
 	var util = nfe.util = {
 		guid:function(){
@@ -182,37 +157,37 @@
         });
 	};
 
-    //此处id为真实id
-	function getURI(id){
-		if(!TYPE_REG.test(id)){
-			id += '.js';
-		}
-		//return nfe.config.base + id;
+    var anonymousMeta = null;
+	var delayMetas = [];
+	/**
+	 * 将id转换为真实的url路径
+	 */
+	function toURL(id){
 		if(nfe.config.base.indexOf('.') == 0){
 			nfe.config.base = uri.join(uri.dirname(window.location.pathname), nfe.config.base);
+		}
+		if(nfe.config.alias[id]){
+			id = nfe.config.alias[id];	
+		}
+		if(!TYPE_REG.test(id)){
+			id += '.js';
 		}
 		if(id.indexOf('/') !== 0){
 			id = nfe.config.base + id;
 		}
+		for(var key in nfe.config.paths){
+			var target = nfe.config.paths[key];
+			id = id.replace(new RegExp(key), target);
+		}
+		if(/^http[s]?:\/\//.test(id)){
+			return id;	
+		}
 		return window.location.origin + id;
 	}
 
-    function getId(id){
-        if(nfe.config.alias[id]){
-			id = nfe.config.alias[id];
-		}
-		if(!TYPE_REG.test(id)){
-			id += '.js';
-		}
-        return id;
-    }
-
 	function load(meta, callback){
         
-        //var resId = getId(meta.id);
-        //var url = getURI(resId);
-        var url = getURI(meta.uri);
-
+		var url = meta.uri;
         if(typeof nfe.cache[meta.uri] !== 'undefined'){
             callback.call(this, url);
             return;
@@ -251,8 +226,8 @@
 					if(delayMetas.length > 0){
 						var metas = [];
 						util.each(delayMetas, function(dep, idx){
-							var nid = uri.join(uri.dirname(getId(meta.id)), dep.id);
-							var path = getId(nid);
+							var nid = uri.join(uri.dirname(meta.id), dep.id);
+							var path = toURL(nid);
 							metas[idx] = {
 								id:nid,
 								uri:path
@@ -275,7 +250,9 @@
 		node.onerror = function onerror(){
 			clearTimeout(tid);
 			clearInterval(intId);
-			throw new Error('Error for load url: ' + url);
+			console.error('Error for load resource: ' + url);
+			//throw new Error('Error for load url: ' + url);
+			callback.call(this, url);
 		};
 		head.appendChild(node);
         if (isCss) {
@@ -309,7 +286,7 @@
         ids = ids.concat(nfe.config.preload);
         var metas = [];
         for(var i=0; i<ids.length; i++){
-            var path = getId(ids[i]);
+            var path = toURL(ids[i]);
             metas[i] = {
                 id:ids[i],
 				uri:path
@@ -326,15 +303,14 @@
 			//var root = getId(base);
             nid = uri.join(uri.dirname(base), nid);
         }
-		nid = getId(nid);
+		var url = toURL(nid);
         
-        var meta = nfe.cache[nid];
+        var meta = nfe.cache[url];
         if(typeof meta === 'undefined'){
-            throw new Error('Not find Module: ' + id);
+            throw new Error('Not find Module: ' + '(' + nid + ')' + id);
         }
 
-		var url = getURI(nid);
-		debug(3, '[require] url: ' + url);
+		debug(3, '[require] url: (' + nid + ')' + url);
 		if(typeof meta.exports !== 'undefined'){
 			return meta.exports;
 		}else{
@@ -344,6 +320,7 @@
 				id:nid,
 				uri:url
 			};
+			module = meta;
 			module.exports = {};
 
 			var parentId = id;
@@ -355,13 +332,14 @@
 				var r = function(iid){
 					return require(iid, parentId);
 				};
+				/*
 				r.async = function(ids, callback){
 					if(util.isString(ids)){
 						ids = [ids];
 					}
 					var metas = [];
 					for(var i=0; i<ids.length; i++){
-						var path = getId(ids[i]);
+						var path = toURL(ids[i]);
 						metas[i] = {
 							id:ids[i],
 							uri:path
@@ -369,8 +347,8 @@
 					}
 					Loader.run(metas, callback || function(){});
 				};
+				*/
 				var result = factory.call(global, r, module.exports, module);
-				debug(4, module);
 				if(typeof result === 'undefined'){
 					meta.exports = module.exports;
 					return module.exports;
@@ -415,28 +393,16 @@
 				deps = parseDependencies(factory.toString());
 			}
 		}
-		//var module = {};
-		//factory.apply(this, require, module.exports, module);
-        //id = getId(id);
 
         if(deps.length > 0){
             var metas = [];
             for(var i=0; i<deps.length; i++){
-				/*
-				if(id !== null){
-					var nid = getId(id);
-					var dir = uri.dirname(nid);
-					var dep = deps[i];
-					var url = uri.join(dir, dep);
-					console.log('id: ' + id + ',nid: ' + nid + ', dir: ' + dir + ', dep: ' + dep + ', url: ' + url);
-				}
-				*/
 				var nid, path;
 				if(id === null){
 					nid = deps[i];
 				}else{
 					nid = uri.join(uri.dirname(id), deps[i]);
-					path = getId(nid);
+					path = toURL(nid);
 				}
 				metas[i] = {
 					id:nid,
@@ -453,22 +419,22 @@
         var meta = {
             id:id,
             factory:factory,
+			deps:deps,
 			anonymous:id === null
         };
         if(id !== null){   
-            save(getId(id), meta);
+            save(toURL(id), meta);
         }else{
             anonymousMeta = meta;
         }
 	}
 
-    function save(id, meta){
+    function save(uri, meta){
         
-        debug(1, '[define] ' + id);
-        var nid = id || meta.id;
-		//var url = getURI(nid);
-        debug(1, '[cache] ' + nid);
-		nfe.cache[nid] = meta;
+        debug(1, '[define] ' + uri);
+        var uri = uri || meta.uri;
+        debug(1, '[cache] ' + uri);
+		nfe.cache[uri] = meta;
     }
 
 	var Loader = {
@@ -481,8 +447,6 @@
 			}
 			me.size += metas.length;
 			util.each(metas, function(meta, index){
-                //var id = getId(meta.id);
-				//var url = getURI(id);
                 load(meta, function(url){
                     debug(1, '[loaded] url:' + url);
                     me.size--;		
@@ -511,14 +475,12 @@
 	global.nfe = nfe;
 	global.define = define;
 
-	global._require = require;
-
+	global.__require = require;
 
     var level = 0;
     function debug(lv, msg){
         if(lv < level){
             var d = new Date();
-            //console.log(d.getTime() + ' - ');
 			if(util.isString(msg)){
             	console.log(msg + ' - ' + d.getTime());
 			}else{
@@ -526,4 +488,4 @@
 			}
         }
     }
-})(this, undefined);
+})(this);
