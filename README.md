@@ -31,7 +31,7 @@ define('a/b/c', function(require, exports, module){
 });
 ```
 
-然后通过alias匹配对应的真实路径，(后续支持配置paths，可以实现跨域加载)如果没有找到则真实路径为baseUrl + id + ‘.js’
+然后通过alias匹配对应的真实路径，接着通过paths做路径映射，如果得到的真实路径为URL，则之间返回，否则真实路径为baseUrl + id + '.js'
 
 ####匹配流程：
 
