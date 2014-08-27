@@ -14,13 +14,13 @@ nfe.setConfig({
     base:"./",
     alias:{
 		jquery:'libs/jquery-1.11.1',
-		jqueryui:'libs/jquery-ui',
-        module:'test/modules/module'
+		jqueryui:'libs/jquery-ui'
     },
 	preload:['jquery']
 });
-nfe.use("module", function(m){
+nfe.use("test/modules/module", function(m){
 	m.init();
+	console.log(nfe.cache);
 });
 </script>
 </body>

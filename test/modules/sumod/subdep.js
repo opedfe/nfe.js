@@ -1,5 +1,5 @@
 
-define("test/modules/sumod/subdep", [], function(require, exports, module){
+define(function(require, exports, module){
     
 	exports.config = {
 		name:"subdep"

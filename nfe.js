@@ -117,7 +117,7 @@
 		alias:{}
 	};
 
-	nfe.config.base = uri.dirname(window.location.pathname) + '/';
+	nfe.config.base = window.location.origin + uri.dirname(window.location.pathname) + '/';
 	nfe.cache = {};
 
 	var util = nfe.util = {
@@ -188,7 +188,13 @@
 			id += '.js';
 		}
 		//return nfe.config.base + id;
-        return uri.resolve(nfe.config.base, id);
+		if(nfe.config.base.indexOf('.') == 0){
+			nfe.config.base = uri.join(uri.dirname(window.location.pathname), nfe.config.base);
+		}
+		if(id.indexOf('/') !== 0){
+			id = nfe.config.base + id;
+		}
+		return window.location.origin + id;
 	}
 
     function getId(id){

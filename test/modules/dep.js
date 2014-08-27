@@ -1,5 +1,5 @@
 
-define("test/modules/dep", ["./sumod/subdep"], function(require, exports, module){
+define(function(require, exports, module){
     
     var sub = require('./sumod/subdep');
     sub.init();
