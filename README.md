@@ -26,8 +26,8 @@ define(id?, deps?, function(require, exports, module){
 
 如：
 ```js
-define(‘a/b/c’, function(require, exports, module){
-     require(‘./d’); //这里d的id则为a/b/d
+define('a/b/c', function(require, exports, module){
+     require('./d'); //这里d的id则为a/b/d
 });
 ```
 
@@ -44,19 +44,15 @@ nfe.use中，不允许出现相对路径
 ####可能场景：
 
 - 加载外部依赖，如何确定id？
->如果设置了alias，则id为alias中对应的key值（建议），否则id为应用路径
+     >如果设置了alias，则id为alias中对应的key值（建议），否则id为应用路径
 
 - 加载内部依赖，如果确定id？
->从文件的绝对路径中去除掉baseUrl之后的剩余部分
-
->如：
-
->a.js 位于 /static/js/home/a.js
-
->baseUrl: /static/js/
-
->则该文件的id为：’home/a’ 
+     >从文件的绝对路径中去除掉baseUrl之后的剩余部,
+     如：
+     a.js 位于 /static/js/home/a.js中，其中
+     baseUrl: /static/js/
+     则该文件的id为：'home/a'
 
 
 - 外部依赖的子依赖如何确定id？
->不允许外部依赖出现子依赖，如果存在，则提前合并到主程序中。
+     >不允许外部依赖出现子依赖，如果存在，则提前合并到主程序中。
