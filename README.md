@@ -41,12 +41,12 @@ define('a/b/c', function(require, exports, module){
 
 nfe.use中，不允许出现相对路径
 
-####可能场景：
+####QA：
 
 - 加载外部依赖，如何确定id？
      >如果设置了alias，则id为alias中对应的key值（建议），否则id为应用路径
 
-- 加载内部依赖，如果确定id？
+- 加载内部依赖，如何确定id？
      >从文件的绝对路径中去除掉baseUrl之后的剩余部,
      如：
      a.js 位于 /static/js/home/a.js中，其中
