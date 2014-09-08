@@ -446,15 +446,22 @@
 				me.callback = callback;
 			}
 			me.size += metas.length;
-			util.each(metas, function(meta, index){
-                load(meta, function(url){
-                    debug(1, '[loaded] url:' + url);
-                    me.size--;		
-                    if(me.size === 0){
-                        me.callback.call();
-                    }
-                });
-			});
+
+			/**
+			 * 异步延时处理，等待页面中的define全部都执行完毕
+			 * 否则，后面的依赖文件会被重新加载，失去了合并的意义
+			 */
+			setTimeout(function(){
+				util.each(metas, function(meta, index){
+					load(meta, function(url){
+						debug(1, '[loaded] url:' + url);
+						me.size--;		
+						if(me.size === 0){
+							me.callback.call();
+						}
+					});
+				});
+			}, 0);
 		},
 		run:function(metas, callback){
 			var me = this;
