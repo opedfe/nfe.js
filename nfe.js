@@ -27,7 +27,7 @@
 	};
 
 	var nfe = {
-		version:'1.1.0',
+		version:'1.1.1',
 		cache:{},
 		config:{
 			debug:false,
