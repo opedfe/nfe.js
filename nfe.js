@@ -30,6 +30,7 @@
 		version:'1.1.0',
 		cache:{},
 		config:{
+			debug:false,
 			timeout:15,
 			base:'',
 			preload:[],
@@ -185,14 +186,48 @@
 		return window.location.origin + id;
 	}
 
-	function load(meta, callback){
+	function triggerCallback(url){
+		util.each(nfe.cache, function(meta, path){
+			if(url === path){
+				util.each(meta.callback, function(fn, idx){
+					fn.call(global, url);
+				});
+				meta.callback = [];
+				return false;
+			}
+		});	
+	}
+
+	function load(meta, iCallback){
         
 		var url = meta.uri;
+		var callback = triggerCallback;
+		meta = getMeta(meta.id, meta.uri);
+		meta.callback.push(iCallback);
+		//正在加载中，不需要重复加载
+		if(meta.stat === 1){
+			return;
+		}
+		//如果没有加载过，标记为加载中
+		if(typeof meta.stat === 'undefined'){
+			meta.stat = 1;
+		}
+        nfe.cache[meta.uri] = meta;
+		
+		//如果已经加载过，则直接完成
+		if(meta.stat === 2){
+			callback.call(this, url);
+			return;
+		}
+		/**
         if(typeof nfe.cache[meta.uri] !== 'undefined'){
             callback.call(this, url);
             return;
-        } 
-        nfe.cache[meta.uri] = meta;
+        }else{
+			meta.callback = iCallback;
+		}
+		*/
+        //nfe.cache[meta.uri] = meta;
         debug(1, '[load] url:' + url);
 		var type = util.fileType(url),
 			isJs = type === 'js',
@@ -206,11 +241,19 @@
 		if(isJs){
 			node.type = 'text/javascript';
 			node.async = 'async';
-			node.src = url;
+			if(nfe.config.debug){
+				node.src = url + '?_=' + (new Date()).getTime();
+			}else{
+				node.src = url;
+			}
 		}else if(isCss){
 			node.type = 'text/css';
 			node.rel = 'stylesheet';
-			node.href = url;
+			if(nfe.config.debug){
+				node.href = url + '?_=' + (new Date()).getTime();
+			}else{
+				node.href = url;
+			}
 		}
 		node.onload = node.onreadystatechange = function(){
 			if(node && (!node.readyState || /loaded|complete/.test(node.readyState))){
@@ -219,8 +262,12 @@
 				if(isJs && head && node.parentNode){
 					head.removeChild(node);
                     if(anonymousMeta){
-                        anonymousMeta.id = meta.id;
-                        save(meta.uri, anonymousMeta);
+						var _meta = getMeta(meta.id, meta.uri, 2);
+						for(var key in anonymousMeta){
+							_meta[key] = anonymousMeta[key];
+						}
+                        //anonymousMeta.id = meta.id;
+                        save(meta.uri, _meta);
                         anonymousMeta = null;
                     }
 					if(delayMetas.length > 0){
@@ -228,12 +275,16 @@
 						util.each(delayMetas, function(dep, idx){
 							var nid = uri.join(uri.dirname(meta.id), dep.id);
 							var path = toURL(nid);
+							/**
 							metas[idx] = {
 								id:nid,
 								uri:path
 							};
+							*/
+							metas[idx] = getMeta(nid, path);
 						});
-						Loader.push(metas);
+						var guid = getQueueIdByUri(url);
+						Loader.push(guid, metas);
 						delayMetas = [];
 					}
 					if(callback){
@@ -279,6 +330,23 @@
         }
 	}
 
+	function getMeta(id, path, stat){
+		var meta = nfe.cache[path];
+		if(meta){
+			if(typeof stat !== 'undefined'){
+				meta.stat = stat;
+			}
+		}else{
+			meta = {
+				id:id,
+				uri:path,
+				callback:[],
+				stat:stat
+			};
+		}
+		return meta;
+	}
+
 	nfe.use = function(ids, callback){
 		if(util.isString(ids)){
 			ids = [ids];
@@ -287,10 +355,13 @@
         var metas = [];
         for(var i=0; i<ids.length; i++){
             var path = toURL(ids[i]);
+			/**
             metas[i] = {
                 id:ids[i],
 				uri:path
             };
+			*/
+			metas[i] = getMeta(ids[i], path);
         }
         //ids = transferIds(nfe.config.base, ids);
 		//Loader.run(ids, callback);
@@ -332,22 +403,24 @@
 				var r = function(iid){
 					return require(iid, parentId);
 				};
-				/*
 				r.async = function(ids, callback){
 					if(util.isString(ids)){
 						ids = [ids];
 					}
 					var metas = [];
 					for(var i=0; i<ids.length; i++){
-						var path = toURL(ids[i]);
+						var _id = uri.join(uri.dirname(id), ids[i]);
+						var path = toURL(_id);
+						/**
 						metas[i] = {
-							id:ids[i],
+							id:_id,
 							uri:path
 						};
+						*/
+						metas[i] = getMeta(_id, path);
 					}
 					Loader.run(metas, callback || function(){});
 				};
-				*/
 				var result = factory.call(global, r, module.exports, module);
 				if(typeof result === 'undefined'){
 					meta.exports = module.exports;
@@ -404,27 +477,42 @@
 					nid = uri.join(uri.dirname(id), deps[i]);
 					path = toURL(nid);
 				}
+				/**
 				metas[i] = {
 					id:nid,
 					uri:path
 				};
+				*/
+				metas[i] = getMeta(nid, path);
             }
 			// 如果id不存在，则延迟处理，到onload中
 			if(id !== null){
-		    	Loader.push(metas);
+				var guid = getQueueIdByUri(toURL(id));
+		    	Loader.push(guid, metas);
 			}else{
 				delayMetas = metas;
 			}
         }
+		/**
         var meta = {
             id:id,
             factory:factory,
 			deps:deps,
 			anonymous:id === null
         };
+		*/
         if(id !== null){   
+			var meta = getMeta(id, toURL(id), 2);
+			meta.factory = factory;
+			meta.deps = deps;
+			meta.anonymous = id === null;
             save(toURL(id), meta);
         }else{
+			var meta = {
+				factory:factory,
+				deps:deps,
+				anonymous:id === null
+			};
             anonymousMeta = meta;
         }
 	}
@@ -437,15 +525,29 @@
 		nfe.cache[uri] = meta;
     }
 
+	var load_queue = {};
+
+	function getQueueIdByUri(url){
+		var ret = '';
+		util.each(load_queue, function(queue, key){
+			util.each(queue, function(meta, idx){
+				if(meta.uri === url){
+					ret = key;
+					return false;
+				}
+			});
+		});
+		return ret;
+	}
+
 	var Loader = {
-		size:0,
-		callback:function(){},
-		push:function(metas, callback){
+		callbacks:{},
+		push:function(guid, metas, callback){
 			var me = this;
-			if(typeof callback != 'undefined'){
-				me.callback = callback;
+			if(typeof callback !== 'undefined'){
+				me.callbacks[guid] = callback;
 			}
-			me.size += metas.length;
+			load_queue[guid] = load_queue[guid].concat(metas);
 
 			/**
 			 * 异步延时处理，等待页面中的define全部都执行完毕
@@ -455,9 +557,15 @@
 				util.each(metas, function(meta, index){
 					load(meta, function(url){
 						debug(1, '[loaded] url:' + url);
-						me.size--;		
-						if(me.size === 0){
-							me.callback.call();
+						var queue = load_queue[guid];
+						util.each(queue, function(meta, idx){
+							if(meta.uri === url){
+								queue.splice(idx, 1);
+								return false;
+							}
+						});
+						if(queue.length === 0){
+							me.callbacks[guid].call();
 						}
 					});
 				});
@@ -465,7 +573,9 @@
 		},
 		run:function(metas, callback){
 			var me = this;
-			me.push(metas, function(){
+			var guid = util.guid();
+			load_queue[guid] = [];
+			me.push(guid, metas, function(){
                 debug(3, 'load resources finished!');
 				var args = [];
 				util.each(metas, function(meta, j){
@@ -481,6 +591,8 @@
 	define.cmd = {};
 	global.nfe = nfe;
 	global.define = define;
+
+	global.queue = load_queue;
 
 	global.__require = require;
 

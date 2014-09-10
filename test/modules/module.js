@@ -4,10 +4,24 @@ define(function(require, exports, module){
 	var $ = require('jqueryui');
     dep.init();
 	exports.obj = {
-		name:"module"
+		name:"module-name"
+	};
+	exports.clickwin = function(){
+		require.async(['./async', './dep'], function(a, b){
+			console.log(a);
+			console.log(b);
+		});
+		require.async(['./async', './dep'], function(a, b){
+			console.log(a);
+			console.log(b);
+		});
 	};
 
     exports.init = function(){
+		var me = this;
+		window.onclick = function(){
+			me.clickwin();
+		}
         console.log(this.obj.name);
 		console.log($);
 		console.log($('body'));
