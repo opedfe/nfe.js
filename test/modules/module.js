@@ -19,7 +19,8 @@ define(function(require, exports, module){
 
     exports.init = function(){
 		var me = this;
-		window.onclick = function(){
+		document.onclick = function(){
+			console.log('click');
 			me.clickwin();
 		}
         console.log(this.obj.name);

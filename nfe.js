@@ -95,6 +95,8 @@
 	nfe.config.base = uri.dirname(window.location.pathname) + '/';
 
 	var base_guid = 1;
+	var isOldWebKit = +navigator.userAgent.replace(/.*AppleWebKit\/(\d+)\..*/, '$1') < 536;
+	var	head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
 
 	var util = nfe.util = {
 		guid:function(){
@@ -183,7 +185,9 @@
 		if(/^http[s]?:\/\//.test(id)){
 			return id;	
 		}
-		return window.location.origin + id;
+		var loc = window.location;
+		//return window.location.origin + id;
+		return loc.protocol + '//' + loc.host + id;
 	}
 
 	function triggerCallback(url){
@@ -197,6 +201,33 @@
 			}
 		});	
 	}
+
+var currentlyAddingScript
+var interactiveScript
+function getCurrentScript() {
+  if (currentlyAddingScript) {
+    return currentlyAddingScript
+  }
+
+  // For IE6-9 browsers, the script onload event may not fire right
+  // after the script is evaluated. Kris Zyp found that it
+  // could query the script nodes and the one that is in "interactive"
+  // mode indicates the current script
+  // ref: http://goo.gl/JHfFW
+  if (interactiveScript && interactiveScript.readyState === "interactive") {
+    return interactiveScript
+  }
+
+  var scripts = head.getElementsByTagName("script")
+
+  for (var i = scripts.length - 1; i >= 0; i--) {
+    var script = scripts[i]
+    if (script.readyState === "interactive") {
+      interactiveScript = script
+      return interactiveScript
+    }
+  }
+}
 
 	function load(meta, iCallback){
         
@@ -232,15 +263,14 @@
 		var type = util.fileType(url),
 			isJs = type === 'js',
 			isCss = type === 'css',
-			isOldWebKit = +navigator.userAgent.replace(/.*AppleWebKit\/(\d+)\..*/, '$1') < 536,
-			head = document.head,
 			node = document.createElement(isJs ? 'script' : 'link'),
 			supportOnload = 'onload' in node,
 			tid = setTimeout(onerror, (nfe.config.timeout || 15) * 1000),
 			intId, intTimer;
+		node.charset = 'utf-8';
 		if(isJs){
 			node.type = 'text/javascript';
-			node.async = 'async';
+			node.async = true;
 			if(nfe.config.debug){
 				node.src = url + '?_=' + (new Date()).getTime();
 			}else{
@@ -270,23 +300,6 @@
                         save(meta.uri, _meta);
                         anonymousMeta = null;
                     }
-					if(delayMetas.length > 0){
-						var metas = [];
-						util.each(delayMetas, function(dep, idx){
-							var nid = uri.join(uri.dirname(meta.id), dep.id);
-							var path = toURL(nid);
-							/**
-							metas[idx] = {
-								id:nid,
-								uri:path
-							};
-							*/
-							metas[idx] = getMeta(nid, path);
-						});
-						var guid = getQueueIdByUri(url);
-						Loader.push(guid, metas);
-						delayMetas = [];
-					}
 					if(callback){
 						callback.call(this, url);
 					}
@@ -298,14 +311,20 @@
                 }
 			}
 		};
-		node.onerror = function onerror(){
+
+		function onerror(){
 			clearTimeout(tid);
 			clearInterval(intId);
 			console.error('Error for load resource: ' + url);
 			//throw new Error('Error for load url: ' + url);
 			callback.call(this, url);
 		};
+
+		node.onerror = onerror;
+
+  		currentlyAddingScript = node
 		head.appendChild(node);
+  		currentlyAddingScript = null;
         if (isCss) {
             if (isOldWebKit || !supportOnload) {
                 intTimer = 0;
@@ -467,6 +486,7 @@
 			}
 		}
 
+		/**
         if(deps.length > 0){
             var metas = [];
             for(var i=0; i<deps.length; i++){
@@ -477,12 +497,6 @@
 					nid = uri.join(uri.dirname(id), deps[i]);
 					path = toURL(nid);
 				}
-				/**
-				metas[i] = {
-					id:nid,
-					uri:path
-				};
-				*/
 				metas[i] = getMeta(nid, path);
             }
 			// 如果id不存在，则延迟处理，到onload中
@@ -493,6 +507,7 @@
 				delayMetas = metas;
 			}
         }
+		*/
 		/**
         var meta = {
             id:id,
@@ -501,28 +516,50 @@
 			anonymous:id === null
         };
 		*/
-        if(id !== null){   
-			var meta = getMeta(id, toURL(id), 2);
-			meta.factory = factory;
-			meta.deps = deps;
-			meta.anonymous = id === null;
-            save(toURL(id), meta);
-        }else{
-			var meta = {
-				factory:factory,
-				deps:deps,
-				anonymous:id === null
-			};
+		var meta = {};
+		if(id !== null){
+			meta = getMeta(id, toURL(id), 2);
+		}else{
+			var script = getCurrentScript();
+			if(script){
+				var uri = script.src.replace(/\?.+$/, '');
+				meta = getMeta(id, uri, 2);
+			}
+		}
+		meta.factory = factory;
+		meta.deps = deps;
+		meta.anonymous = id === null;
+
+		if(meta.uri){
+            save(meta.uri, meta);
+		}else{
             anonymousMeta = meta;
-        }
+		}
 	}
 
-    function save(uri, meta){
+    function save(url, meta){
         
-        debug(1, '[define] ' + uri);
-        var uri = uri || meta.uri;
-        debug(1, '[cache] ' + uri);
-		nfe.cache[uri] = meta;
+        debug(1, '[define] ' + url);
+        var url = url || meta.uri;
+        debug(1, '[cache] ' + url);
+		//var tmp = nfe.cache[url];
+		//meta.id = tmp.id;
+		//meta.callback = tmp.callback;
+		nfe.cache[url] = meta;
+
+		var id = meta.id;
+		var deps = meta.deps;
+        if(deps.length > 0){
+            var metas = [];
+			var root = id ? uri.dirname(id) : meta.uri;
+            for(var i=0; i<deps.length; i++){
+				var nid = uri.join(root, deps[i]);
+				var path = toURL(nid);
+				metas[i] = getMeta(nid, path);
+            }
+			var guid = getQueueIdByUri(url);
+			Loader.push(guid, metas);
+        }
     }
 
 	var load_queue = {};
